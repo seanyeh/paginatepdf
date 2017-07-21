@@ -1,0 +1,74 @@
+#!/usr/bin/bash
+#
+# paginatepdf - Script to add page numbers to a PDF file
+# By Sean Yeh
+#
+# Requires: pdftk and pdflatex
+#
+# Inspired by:
+# http://cazencott.info/index.php/post/2015/04/30/Numbering-PDF-Pages
+
+input="$1"
+output="$2"
+
+show_usage() {
+    printf "Usage: paginatepdf INPUT_FILE OUTPUT_FILE\n"
+    exit
+}
+
+confirm() {
+    read -p "(y/N)? " choice
+    if [ "$choice" = "y" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Show usage if no input file given
+if [ ! -f "$input" ]; then
+    printf "Valid input file not specified.\n\n"
+    show_usage
+fi
+
+# If output file not given, default to input + "_paginated"
+if [ -z "$output" ]; then
+    output=$(basename -s ".pdf" "$input")"_paginated.pdf"
+fi
+
+# If file already exists
+if [ -e "$output" ]; then
+    if [ -f "$output" ]; then
+        printf "Overwrite file: %s " "$output"
+        confirm || exit # Exit if not confirmed
+    else
+        printf "\"%s\" already exists and is not a file\n" "$output"
+        show_usage
+    fi
+fi
+
+#######
+# Run #
+#######
+
+texfile="
+\\\\documentclass[12pt,a4paper]{article}
+\\\\usepackage{multido}
+\\\\usepackage[hmargin=.8cm,vmargin=1.5cm,nohead,nofoot]{geometry}
+\\\\begin{document}
+\\\\multido{}{%s}{\\\\vphantom{x} \\\\newpage}
+\\\\end{document}
+"
+
+numpages=$(pdftk "$input" dump_data | grep NumberOfPages | cut -d' ' -f2)
+
+# Create temp directory
+tmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'tmpdir')
+
+# Create tex file
+printf "$texfile\n" "$numpages" > "$tmpdir/numbers.tex"
+pdflatex --output-directory="$tmpdir" "$tmpdir/numbers.tex" > /dev/null
+
+# pdftk multistamp
+pdftk "$input" multistamp "$tmpdir/numbers.pdf" output "$output"
+printf "File saved as: %s\n" "$output"
