@@ -25,6 +25,11 @@ confirm() {
     fi
 }
 
+# Help
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    show_usage
+fi
+
 # Show usage if no input file given
 if [ ! -f "$input" ]; then
     printf "Valid input file not specified.\n\n"
